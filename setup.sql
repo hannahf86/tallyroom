@@ -18,6 +18,10 @@ create table if not exists public.documents (
   created_at timestamptz not null default now()
 );
 
+-- Overdue reminders: record when a reminder last included this document,
+-- so clients are reminded weekly rather than every day.
+alter table public.documents add column if not exists last_reminded_at timestamptz;
+
 grant select on public.clients, public.documents to authenticated;
 grant all on public.clients, public.documents to service_role;
 

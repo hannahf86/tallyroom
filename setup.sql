@@ -29,8 +29,14 @@ create policy "clients see own record" on public.clients
   for select to authenticated
   using (user_id = auth.uid());
 
--- Release 1.4: client businesses split out from user accounts
+-- Release 1.4: client businesses split out from user accounts.
+-- Documents belong to a client business, so look up the business
+-- owned by the signed-in user rather than comparing to the user's ID.
 drop policy if exists "clients see own documents" on public.documents;
 create policy "clients see own documents" on public.documents
   for select to authenticated
-  using (client_id = auth.uid());
+  using (
+    client_id in (
+      select id from public.clients where user_id = (select auth.uid())
+    )
+  );

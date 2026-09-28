@@ -24,12 +24,21 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: client } = await supabase.from("clients").select("name").single();
+  const { data: client } = await supabase
+    .from("clients")
+    .select("name")
+    .single();
 
-  const { data: documents } = await supabase
+  // changed: keep the error instead of discarding it
+  const { data: documents, error: documentsError } = await supabase
     .from("documents")
     .select("id, name, doc_type, status, due_date")
     .order("due_date", { ascending: true });
+
+  // new: log the technical detail on the server, never on screen
+  if (documentsError) {
+    console.error("Failed to load documents:", documentsError);
+  }
 
   const docs = (documents ?? []) as Document[];
   const outstanding = docs.filter((d) => d.status === "outstanding").length;
@@ -41,7 +50,10 @@ export default async function DashboardPage() {
           <h1>{client?.name ?? "Your documents"}</h1>
           <p className="muted">Signed in as {user.email}</p>
         </div>
-        <span className="pill">Outstanding: {outstanding}</span>
+        {/* changed: don't show a misleading count if loading failed */}
+        {!documentsError && (
+          <span className="pill">Outstanding: {outstanding}</span>
+        )}
       </div>
 
       <table>
@@ -54,7 +66,16 @@ export default async function DashboardPage() {
           </tr>
         </thead>
         <tbody>
-          {docs.length === 0 ? (
+          {/* new: error state, separate from the empty state */}
+          {documentsError ? (
+            <tr>
+              <td className="empty" colSpan={4} role="alert">
+                We couldn't load your documents right now. Your documents are
+                safe. Please try again shortly, or contact us if this keeps
+                happening.
+              </td>
+            </tr>
+          ) : docs.length === 0 ? (
             <tr>
               <td className="empty" colSpan={4}>
                 No documents yet.
@@ -65,7 +86,9 @@ export default async function DashboardPage() {
               <tr key={doc.id}>
                 <td>{doc.name}</td>
                 <td>{typeLabels[doc.doc_type] ?? doc.doc_type}</td>
-                <td>{doc.status === "received" ? "Received" : "Outstanding"}</td>
+                <td>
+                  {doc.status === "received" ? "Received" : "Outstanding"}
+                </td>
                 <td>{new Date(doc.due_date).toLocaleDateString("en-GB")}</td>
               </tr>
             ))
